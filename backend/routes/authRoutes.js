@@ -6,16 +6,18 @@ import {
   forgotPassword,
   resetPassword,
   resendOTP,
-  getCurrentUser
+  getCurrentUser,
+  addPhoneNumber
 } from '../controllers/authController.js';
 import {
   validateRegistration,
   validateLogin,
   validateOTP,
   validatePasswordReset,
-  validateEmail
+  validateEmail,
+  validatePhoneNumberOnly
 } from '../middleware/validation.js';
-import { authenticateToken } from '../middleware/auth.js';
+import { authenticateToken, requirePhoneNumber } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -41,6 +43,13 @@ router.post('/verify-email', validateOTP, verifyEmail);
 router.post('/login', validateLogin, login);
 
 /**
+ * @route   POST /api/auth/add-phone
+ * @desc    Add phone number for authenticated user
+ * @access  Protected
+ */
+router.post('/add-phone', authenticateToken, validatePhoneNumberOnly, addPhoneNumber);
+
+/**
  * @route   POST /api/auth/forgot-password
  * @desc    Request password reset OTP
  * @access  Public
@@ -64,8 +73,8 @@ router.post('/resend-otp', validateEmail, resendOTP);
 /**
  * @route   GET /api/auth/me
  * @desc    Get current user profile
- * @access  Protected (requires JWT)
+ * @access  Protected (requires JWT) + Phone required
  */
-router.get('/me', authenticateToken, getCurrentUser);
+router.get('/me', authenticateToken, requirePhoneNumber, getCurrentUser);
 
 export default router;

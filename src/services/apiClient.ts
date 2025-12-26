@@ -101,6 +101,19 @@ export const apiClient = {
     return data;
   },
 
+  async verifyEmail(email, otp) {
+    const res = await fetch(`${API_BASE}/auth/verify-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, otp })
+    });
+    const data = await res.json();
+    if (data.success && data.data?.token) {
+      setAuthToken(data.data.token);
+    }
+    return data;
+  },
+
   async forgotPassword(email) {
     const res = await fetch(`${API_BASE}/auth/forgot-password`, {
       method: 'POST',

@@ -67,7 +67,7 @@ export const verifyEmail = async (req, res) => {
   try {
     const { email, otp } = req.body;
 
-    // Verify OTP and activate account
+    // Verify OTP and activate account (skip validation for legacy records)
     const user = await UserModel.verifyOTP(email, otp);
 
     // Find complete user data
@@ -90,9 +90,11 @@ export const verifyEmail = async (req, res) => {
         token,
         user: {
           id: fullUser.id,
-          fullName: fullUser.full_name,
+          fullName: fullUser.full_name || fullUser.fullName || 'User',
           email: fullUser.email,
-          phoneNumber: fullUser.phone_number,
+          phoneNumber: fullUser.phone_number || fullUser.phoneNumber || null,
+          phoneVerified: fullUser.phone_verified ?? fullUser.phoneVerified ?? false,
+          phoneRequired: !(fullUser.phone_number || fullUser.phoneNumber),
           role: fullUser.role,
           emailVerified: true
         }
@@ -163,7 +165,9 @@ export const login = async (req, res) => {
           id: user._id,
           fullName: user.fullName,
           email: user.email,
-          phoneNumber: user.phoneNumber,
+          phoneNumber: user.phoneNumber || null,
+          phoneVerified: user.phoneVerified,
+          phoneRequired: !user.phoneNumber,
           role: user.role,
           emailVerified: user.emailVerified
         }
@@ -299,6 +303,42 @@ export const resendOTP = async (req, res) => {
 };
 
 /**
+ * Add phone number for authenticated user
+ * POST /api/auth/add-phone
+ */
+export const addPhoneNumber = async (req, res) => {
+  try {
+    const { phoneNumber } = req.body;
+
+    const result = await UserModel.addPhoneNumber(req.user.userId, phoneNumber);
+
+    res.json({
+      success: true,
+      message: 'Phone number added',
+      data: {
+        phoneNumber: result.phoneNumber,
+        phoneVerified: result.phoneVerified,
+        phoneRequired: false
+      }
+    });
+  } catch (error) {
+    if (error.message === 'PHONE_EXISTS') {
+      return res.status(409).json({
+        success: false,
+        error: 'PHONE_EXISTS',
+        message: 'This phone number is already in use'
+      });
+    }
+
+    res.status(400).json({
+      success: false,
+      error: error.message || 'Failed to add phone number',
+      message: 'Unable to add phone number'
+    });
+  }
+};
+
+/**
  * Get current user profile
  * GET /api/auth/me
  */
@@ -318,12 +358,14 @@ export const getCurrentUser = async (req, res) => {
       data: {
         user: {
           id: user.id,
-          fullName: user.full_name,
+          fullName: user.fullName || user.full_name,
           email: user.email,
-          phoneNumber: user.phone_number,
+          phoneNumber: user.phoneNumber || user.phone_number,
+          phoneVerified: user.phoneVerified ?? user.phone_verified,
+          phoneRequired: !(user.phoneNumber || user.phone_number),
           role: user.role,
-          emailVerified: user.email_verified,
-          createdAt: user.created_at
+          emailVerified: user.emailVerified ?? user.email_verified,
+          createdAt: user.createdAt || user.created_at
         }
       }
     });

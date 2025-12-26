@@ -23,9 +23,15 @@ const userSchema = new mongoose.Schema({
   },
   phoneNumber: {
     type: String,
-    required: [true, 'Phone number is required'],
+    required: false,
+    unique: true,
+    sparse: true,
     trim: true,
     match: [/^[0-9]{10}$/, 'Phone number must be exactly 10 digits']
+  },
+  phoneVerified: {
+    type: Boolean,
+    default: false
   },
   passwordHash: {
     type: String,
@@ -62,7 +68,7 @@ const userSchema = new mongoose.Schema({
 
 // Indexes for performance
 userSchema.index({ email: 1 });
-userSchema.index({ phoneNumber: 1 });
+userSchema.index({ phoneNumber: 1 }, { unique: true, sparse: true });
 userSchema.index({ otpCode: 1 });
 userSchema.index({ emailVerified: 1 });
 
@@ -85,7 +91,8 @@ class UserModel {
       const user = await User.create({
         fullName,
         email: email.toLowerCase(),
-        phoneNumber,
+        phoneNumber: phoneNumber || undefined,
+        phoneVerified: false,
         passwordHash,
         role,
         otpCode,
@@ -99,6 +106,7 @@ class UserModel {
           fullName: user.fullName,
           email: user.email,
           phoneNumber: user.phoneNumber,
+          phoneVerified: user.phoneVerified,
           role: user.role,
           emailVerified: user.emailVerified,
           createdAt: user.createdAt
@@ -156,17 +164,53 @@ class UserModel {
       throw new Error('OTP expired');
     }
 
-    // Mark email as verified and clear OTP
-    user.emailVerified = true;
-    user.otpCode = null;
-    user.otpExpiry = null;
-    await user.save();
+    // Mark email as verified and clear OTP without re-validating legacy missing fields
+    await User.updateOne(
+      { _id: user._id },
+      { $set: { emailVerified: true, otpCode: null, otpExpiry: null } },
+      { runValidators: false }
+    );
 
     return {
       id: user._id,
-      fullName: user.fullName,
+      fullName: user.fullName || user.full_name || 'User',
       email: user.email
     };
+  }
+
+  /**
+   * Add or update phone number for a user
+   */
+  static async addPhoneNumber(userId, phoneNumber) {
+    const normalized = (phoneNumber || '').trim();
+
+    if (!/^[0-9]{10}$/.test(normalized)) {
+      throw new Error('Invalid phone number format');
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    // If the same number is already set, short-circuit
+    if (user.phoneNumber === normalized) {
+      return { phoneNumber: user.phoneNumber, phoneVerified: user.phoneVerified };
+    }
+
+    user.phoneNumber = normalized;
+    user.phoneVerified = false;
+
+    try {
+      await user.save({ validateModifiedOnly: true });
+    } catch (error) {
+      if (error.code === 11000) {
+        throw new Error('PHONE_EXISTS');
+      }
+      throw error;
+    }
+
+    return { phoneNumber: user.phoneNumber, phoneVerified: user.phoneVerified };
   }
 
   /**
@@ -189,9 +233,9 @@ class UserModel {
 
     user.otpCode = otpCode;
     user.otpExpiry = otpExpiry;
-    await user.save();
+    await user.save({ validateBeforeSave: false });
 
-    return { otp: otpCode, fullName: user.fullName };
+    return { otp: otpCode, fullName: user.fullName || user.full_name || 'User' };
   }
 
   /**
@@ -244,9 +288,9 @@ class UserModel {
 
     user.otpCode = otpCode;
     user.otpExpiry = otpExpiry;
-    await user.save();
+    await user.save({ validateBeforeSave: false });
 
-    return { otp: otpCode, fullName: user.fullName };
+    return { otp: otpCode, fullName: user.fullName || user.full_name || 'User' };
   }
 
   /**

@@ -32,11 +32,6 @@ export const validateRegistration = [
     .isEmail().withMessage('Invalid email format')
     .normalizeEmail(),
   
-  body('phoneNumber')
-    .trim()
-    .notEmpty().withMessage('Phone number is required')
-    .matches(/^[0-9]{10}$/).withMessage('Phone number must be exactly 10 digits'),
-  
   body('password')
     .notEmpty().withMessage('Password is required')
     .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
@@ -118,5 +113,17 @@ export const validateEmail = [
     .isEmail().withMessage('Invalid email format')
     .normalizeEmail(),
   
+  handleValidationErrors
+];
+
+/**
+ * Validation rules for phone number only
+ */
+export const validatePhoneNumberOnly = [
+  body('phoneNumber')
+    .trim()
+    .notEmpty().withMessage('Phone number is required')
+    .matches(/^[0-9]{10}$/).withMessage('Phone number must be exactly 10 digits'),
+
   handleValidationErrors
 ];

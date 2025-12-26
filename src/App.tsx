@@ -7,7 +7,8 @@ import Footer from './components/Footer';
 
 // Pages
 import Home from './pages/Home';
-import Login from './pages/LoginNew';
+import Login from './pages/Login';
+import VerifyEmail from './pages/VerifyEmail';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
 import Orders from './pages/Orders';
@@ -48,6 +49,7 @@ const App: React.FC = () => {
               <Route path="/checkout" element={<Checkout />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Login />} /> {/* Reusing login for demo */}
+              <Route path="/verify-email" element={<VerifyEmail />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/orders" element={<Orders />} />
               <Route path="/contact" element={<Contact />} />

@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
+import { User } from '../models/User.js';
 
 dotenv.config();
 
@@ -80,4 +81,33 @@ export const requireSuperAdmin = (req, res, next) => {
   }
 
   next();
+};
+
+/**
+ * Require phone number for protected resources (responds 428 if missing)
+ */
+export const requirePhoneNumber = async (req, res, next) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const user = await User.findById(userId).select('phoneNumber');
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (!user.phoneNumber) {
+      return res.status(428).json({
+        error: 'PHONE_REQUIRED',
+        message: 'Phone number must be added to continue'
+      });
+    }
+
+    next();
+  } catch (error) {
+    console.error('Phone requirement check failed:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
 };

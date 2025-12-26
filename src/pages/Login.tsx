@@ -123,10 +123,10 @@ const Login: React.FC = () => {
 
       const result = await signup(name.trim(), email.toLowerCase().trim(), password, phone);
       if (result.success) {
-        setSuccess('Account created successfully! Redirecting...');
+        setSuccess('Registration successful! Check your email for the OTP.');
         setTimeout(() => {
-          navigate(from, { replace: true });
-        }, 1500);
+          navigate('/verify-email', { state: { email: email.toLowerCase().trim() }, replace: true });
+        }, 1200);
       } else {
         setError(result.message || 'Failed to create account. Please try again.');
       }
@@ -468,44 +468,58 @@ const Login: React.FC = () => {
               )}
               
               {!isSignUp && !isForgotPassword && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsForgotPassword(true);
-                    setError('');
-                    setSuccess('');
-                    setEmail('');
-                  }}
-                  className="w-full text-center py-2 px-4 text-sm font-medium text-brand-600 hover:text-brand-700 focus:outline-none"
-                >
-                  Forgot password?
-                </button>
-
-                {/* Resend OTP for unverified accounts */}
-                {error && error.toLowerCase().includes('verify your email') && (
+                <>
                   <button
                     type="button"
-                    onClick={async () => {
-                      try {
-                        const rsp = await fetch('http://localhost:5000/api/auth/resend-otp', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ email })
-                        }).then(r => r.json());
-                        if (rsp.success) {
-                          setSuccess('OTP resent to your email. Please check your inbox.');
-                        } else {
-                          setError(rsp.message || rsp.error || 'Failed to resend OTP');
-                        }
-                      } catch (e: any) {
-                        setError(e.message || 'Failed to resend OTP');
-                      }
+                    onClick={() => {
+                      setIsForgotPassword(true);
+                      setError('');
+                      setSuccess('');
+                      setEmail('');
                     }}
                     className="w-full text-center py-2 px-4 text-sm font-medium text-brand-600 hover:text-brand-700 focus:outline-none"
                   >
-                    Resend verification OTP
+                    Forgot password?
                   </button>
-                )}
+
+                  {error && error.toLowerCase().includes('verify your email') && (
+                    <div className="space-y-2">
+                      <button
+                        type="button"
+                        onClick={() => navigate('/verify-email', { state: { email } })}
+                        className="w-full text-center py-2 px-4 text-sm font-medium text-brand-700 hover:text-brand-800 focus:outline-none border border-brand-200 rounded-lg"
+                      >
+                        Go to Verify Email
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Resend OTP for unverified accounts */}
+                  {error && error.toLowerCase().includes('verify your email') && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const rsp = await fetch('http://localhost:5000/api/auth/resend-otp', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ email })
+                          }).then(r => r.json());
+                          if (rsp.success) {
+                            setSuccess('OTP resent to your email. Please check your inbox.');
+                          } else {
+                            setError(rsp.message || rsp.error || 'Failed to resend OTP');
+                          }
+                        } catch (e: any) {
+                          setError(e.message || 'Failed to resend OTP');
+                        }
+                      }}
+                      className="w-full text-center py-2 px-4 text-sm font-medium text-brand-600 hover:text-brand-700 focus:outline-none"
+                    >
+                      Resend verification OTP
+                    </button>
+                  )}
+                </>
               )}
 
               {isForgotPassword && (
