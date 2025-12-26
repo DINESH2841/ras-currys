@@ -62,8 +62,11 @@ const Navbar: React.FC = () => {
                 <Link to="/orders" className="text-sm font-medium text-gray-700 hover:text-brand-600">
                   My Orders
                 </Link>
+                <Link to="/profile" className="text-sm font-medium text-gray-700 hover:text-brand-600">
+                  Profile
+                </Link>
                 <div className="flex items-center space-x-2 border-l pl-4 border-gray-200">
-                  <span className="text-sm text-gray-500">Hi, {user.name.split(' ')[0]}</span>
+                  <span className="text-sm text-gray-500">Hi, {user.name?.split(' ')[0] || 'User'}</span>
                   <button onClick={handleLogout} className="p-1 text-gray-400 hover:text-gray-600">
                     <LogOut className="h-5 w-5" />
                   </button>
@@ -112,6 +115,7 @@ const Navbar: React.FC = () => {
                 <>
                   <div className="px-3 py-2 text-base font-medium text-gray-500">Signed in as {user.name}</div>
                   <Link to="/orders" className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-brand-600">My Orders</Link>
+                  <Link to="/profile" className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-brand-600">My Profile</Link>
                   <Link to="/support" className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-brand-600">My Support</Link>
                   <button onClick={handleLogout} className="w-full text-left px-3 py-2 rounded-md text-base font-medium text-red-600 hover:bg-red-50">Sign Out</button>
                 </>

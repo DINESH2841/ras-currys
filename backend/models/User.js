@@ -90,7 +90,7 @@ class UserModel {
 
       const user = await User.create({
         fullName,
-        email: email.toLowerCase(),
+        email: email.toLowerCase().trim(),
         phoneNumber: phoneNumber || undefined,
         phoneVerified: false,
         passwordHash,
@@ -122,10 +122,10 @@ class UserModel {
   }
 
   /**
-   * Find user by email
+   * Find user by email (normalized)
    */
   static async findByEmail(email) {
-    return await User.findOne({ email: email.toLowerCase() });
+    return await User.findOne({ email: email.toLowerCase().trim() });
   }
 
   /**
@@ -146,7 +146,8 @@ class UserModel {
    * Verify OTP and activate account
    */
   static async verifyOTP(email, otp) {
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await User.findOne({ email: normalizedEmail });
 
     if (!user) {
       throw new Error('User not found');
@@ -165,6 +166,7 @@ class UserModel {
     }
 
     // Mark email as verified and clear OTP without re-validating legacy missing fields
+    // CRITICAL: Do NOT touch passwordHash here
     await User.updateOne(
       { _id: user._id },
       { $set: { emailVerified: true, otpCode: null, otpExpiry: null } },
@@ -198,11 +200,13 @@ class UserModel {
       return { phoneNumber: user.phoneNumber, phoneVerified: user.phoneVerified };
     }
 
-    user.phoneNumber = normalized;
-    user.phoneVerified = false;
-
+    // Use updateOne to avoid triggering password re-hash or validation
     try {
-      await user.save({ validateModifiedOnly: true });
+      await User.updateOne(
+        { _id: userId },
+        { $set: { phoneNumber: normalized, phoneVerified: false } },
+        { runValidators: false }
+      );
     } catch (error) {
       if (error.code === 11000) {
         throw new Error('PHONE_EXISTS');
@@ -210,14 +214,15 @@ class UserModel {
       throw error;
     }
 
-    return { phoneNumber: user.phoneNumber, phoneVerified: user.phoneVerified };
+    return { phoneNumber: normalized, phoneVerified: false };
   }
 
   /**
    * Generate new OTP for forgot password
    */
   static async generatePasswordResetOTP(email) {
-    const user = await this.findByEmail(email);
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await User.findOne({ email: normalizedEmail });
     
     if (!user) {
       throw new Error('Email not registered');
@@ -231,9 +236,12 @@ class UserModel {
     const otpCode = crypto.randomInt(100000, 999999).toString();
     const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
 
-    user.otpCode = otpCode;
-    user.otpExpiry = otpExpiry;
-    await user.save({ validateBeforeSave: false });
+    // Use updateOne to avoid touching passwordHash
+    await User.updateOne(
+      { _id: user._id },
+      { $set: { otpCode, otpExpiry } },
+      { runValidators: false }
+    );
 
     return { otp: otpCode, fullName: user.fullName || user.full_name || 'User' };
   }
@@ -242,7 +250,8 @@ class UserModel {
    * Reset password using OTP
    */
   static async resetPassword(email, otp, newPassword) {
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await User.findOne({ email: normalizedEmail });
 
     if (!user) {
       throw new Error('User not found');
@@ -256,14 +265,15 @@ class UserModel {
       throw new Error('OTP expired');
     }
 
-    // Hash new password
+    // Hash new password with bcrypt (ONLY allowed place besides registration)
     const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
 
-    // Update password and clear OTP
-    user.passwordHash = passwordHash;
-    user.otpCode = null;
-    user.otpExpiry = null;
-    await user.save();
+    // Update password and clear OTP without re-validating legacy missing fields
+    await User.updateOne(
+      { _id: user._id },
+      { $set: { passwordHash, otpCode: null, otpExpiry: null } },
+      { runValidators: false }
+    );
 
     return true;
   }
@@ -272,7 +282,8 @@ class UserModel {
    * Resend OTP for unverified users
    */
   static async resendOTP(email) {
-    const user = await this.findByEmail(email);
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await User.findOne({ email: normalizedEmail });
     
     if (!user) {
       throw new Error('User not found');
@@ -286,9 +297,12 @@ class UserModel {
     const otpCode = crypto.randomInt(100000, 999999).toString();
     const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
 
-    user.otpCode = otpCode;
-    user.otpExpiry = otpExpiry;
-    await user.save({ validateBeforeSave: false });
+    // Use updateOne to avoid touching passwordHash
+    await User.updateOne(
+      { _id: user._id },
+      { $set: { otpCode, otpExpiry } },
+      { runValidators: false }
+    );
 
     return { otp: otpCode, fullName: user.fullName || user.full_name || 'User' };
   }

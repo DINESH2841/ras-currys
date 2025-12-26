@@ -118,8 +118,11 @@ export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    // Normalize email
+    const normalizedEmail = email.toLowerCase().trim();
+
     // Find user
-    const user = await UserModel.findByEmail(email);
+    const user = await UserModel.findByEmail(normalizedEmail);
     if (!user) {
       return res.status(401).json({
         success: false,
@@ -141,6 +144,16 @@ export const login = async (req, res) => {
 
     // Verify password with bcrypt
     const isValidPassword = await UserModel.verifyPassword(password, user.passwordHash);
+    
+    // Temporary debug logging (remove after testing)
+    console.log('[LOGIN DEBUG]', {
+      email: normalizedEmail,
+      foundUser: !!user,
+      emailVerified: user.emailVerified,
+      hasPasswordHash: !!user.passwordHash,
+      passwordMatch: isValidPassword
+    });
+
     if (!isValidPassword) {
       return res.status(401).json({
         success: false,
