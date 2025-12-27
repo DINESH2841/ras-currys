@@ -3,8 +3,15 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { connectDatabase } from './config/database.js';
 import { verifyEmailConnection } from './services/emailService.js';
+import { logger } from './config/logger.js';
+import { requestIdMiddleware, requestLoggingMiddleware, errorLoggingMiddleware } from './middleware/requestLogger.js';
+import { csrfTokenMiddleware, verifyCsrfToken } from './middleware/csrf.js';
 import authRoutes from './routes/authRoutes.js';
 import productRoutes from './routes/productRoutes.js';
+import ticketRoutes from './routes/ticketRoutes.js';
+import userRoutes from './routes/userRoutes.js';
+import orderRoutes from './routes/orderRoutes.js';
+import paymentRoutes from './routes/paymentRoutes.js';
 
 dotenv.config();
 
@@ -14,6 +21,12 @@ const PORT = process.env.PORT || 5000;
 // ==================== MIDDLEWARE ====================
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Request ID middleware (must be first)
+app.use(requestIdMiddleware);
+
+// Request logging middleware
+app.use(requestLoggingMiddleware);
 
 // CORS configuration (supports multiple origins via FRONTEND_URL or FRONTEND_URLS)
 const allowedOrigins = (process.env.FRONTEND_URLS || process.env.FRONTEND_URL || 'http://localhost:3000,http://localhost:3001')
@@ -30,20 +43,20 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'X-Request-ID']
 }));
+
+// CSRF token middleware (generates tokens)
+app.use(csrfTokenMiddleware);
+
+// CSRF verification middleware (verifies on state-changing requests)
+app.use(verifyCsrfToken);
 
 // Security headers
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
-  next();
-});
-
-// Request logging middleware
-app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
   next();
 });
 
@@ -59,6 +72,10 @@ app.get('/health', (req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
+app.use('/api/tickets', ticketRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/orders', orderRoutes);
+app.use('/api/payments', paymentRoutes);
 
 // 404 handler
 app.use((req, res) => {
@@ -69,12 +86,22 @@ app.use((req, res) => {
   });
 });
 
-// Global error handler
+// Global error handler (uses error logging middleware for request context)
 app.use((err, req, res, next) => {
-  console.error('Server error:', err);
-  res.status(500).json({
+  const statusCode = err.statusCode || 500;
+  const message = err.message || 'Internal server error';
+  
+  logger.error('Unhandled error', {
+    statusCode,
+    message,
+    stack: err.stack,
+    url: req.originalUrl,
+    method: req.method
+  });
+
+  res.status(statusCode).json({
     success: false,
-    error: 'Internal server error',
+    error: statusCode === 500 ? 'Internal server error' : message,
     message: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
   });
 });
@@ -82,51 +109,46 @@ app.use((err, req, res, next) => {
 // ==================== SERVER STARTUP ====================
 const startServer = async () => {
   try {
-    console.log('\n🚀 Starting RAS Currys Backend Server...\n');
+    logger.info('🚀 Starting RAS Currys Backend Server...');
 
     // Connect to MongoDB
     await connectDatabase();
+    logger.info('✓ Connected to MongoDB');
 
     // Verify email connection
     const emailConnected = await verifyEmailConnection();
     if (!emailConnected) {
-      console.warn('⚠️  Warning: Email service not configured. OTP emails will fail.');
-      console.warn('⚠️  Please set SMTP_USER and SMTP_PASS in .env file\n');
+      logger.warn('⚠️ Email service not configured. OTP emails will fail.');
+      logger.warn('⚠️ Please set SMTP_USER and SMTP_PASS in .env file');
+    } else {
+      logger.info('✓ Email service configured');
     }
 
     // Start server
     app.listen(PORT, () => {
-      console.log(`\n✓ RAS Currys Backend running on http://localhost:${PORT}`);
-      console.log(`✓ Environment: ${process.env.NODE_ENV}`);
-      console.log(`✓ Frontend URL: ${process.env.FRONTEND_URL}`);
-      console.log(`✓ Database: MongoDB Atlas`);
-      console.log(`✓ Email Service: Gmail SMTP ${emailConnected ? '(Connected)' : '(Not Configured)'}`);
-      console.log(`\n📚 API Documentation:`);
-      console.log(`   POST   /api/auth/register       - Register new user`);
-      console.log(`   POST   /api/auth/verify-email   - Verify email with OTP`);
-      console.log(`   POST   /api/auth/login          - Login user`);
-      console.log(`   POST   /api/auth/forgot-password - Request password reset`);
-      console.log(`   POST   /api/auth/reset-password - Reset password with OTP`);
-      console.log(`   POST   /api/auth/resend-otp     - Resend verification OTP`);
-      console.log(`   GET    /api/auth/me             - Get current user (JWT)`);
-      console.log(`\n🔐 JWT Authentication: Bearer token required for protected routes`);
-      console.log(`📧 OTP Expiry: 10 minutes`);
-      console.log(`🔒 Password Hashing: bcrypt (12 rounds)\n`);
+      logger.info(`✓ RAS Currys Backend running on http://localhost:${PORT}`);
+      logger.info(`✓ Environment: ${process.env.NODE_ENV}`);
+      logger.info(`✓ Frontend URL: ${process.env.FRONTEND_URL}`);
+      logger.info(`✓ Database: MongoDB`);
+      logger.info(`✓ Email Service: Gmail SMTP ${emailConnected ? '(Connected)' : '(Not Configured)'}`);
+      logger.info(`✓ Logging: Winston (Level: ${process.env.LOG_LEVEL || 'debug'})`);
+      logger.info(`✓ CSRF Protection: Enabled`);
+      logger.info(`✓ OTP Hashing: HMAC-SHA256`);
     });
   } catch (error) {
-    console.error('Failed to start server:', error);
+    logger.error('Failed to start server', { error: error.message, stack: error.stack });
     process.exit(1);
   }
 };
 
 // Handle graceful shutdown
 process.on('SIGTERM', async () => {
-  console.log('\n⚠️  SIGTERM received. Shutting down gracefully...');
+  logger.warn('SIGTERM received. Shutting down gracefully...');
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
-  console.log('\n⚠️  SIGINT received. Shutting down gracefully...');
+  logger.warn('SIGINT received. Shutting down gracefully...');
   process.exit(0);
 });
 

@@ -41,7 +41,13 @@ export const authenticateToken = (req, res, next) => {
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
   if (!token) {
-    return res.status(401).json({ error: 'Access token required' });
+    return res.status(401).json({
+      success: false,
+      error: {
+        code: 'TOKEN_REQUIRED',
+        message: 'Access token is required'
+      }
+    });
   }
 
   try {
@@ -49,7 +55,13 @@ export const authenticateToken = (req, res, next) => {
     req.user = decoded;
     next();
   } catch (error) {
-    return res.status(403).json({ error: 'Invalid or expired token' });
+    return res.status(403).json({
+      success: false,
+      error: {
+        code: 'INVALID_TOKEN',
+        message: 'Invalid or expired token'
+      }
+    });
   }
 };
 
@@ -58,11 +70,23 @@ export const authenticateToken = (req, res, next) => {
  */
 export const requireAdmin = (req, res, next) => {
   if (!req.user) {
-    return res.status(401).json({ error: 'Authentication required' });
+    return res.status(401).json({
+      success: false,
+      error: {
+        code: 'UNAUTHORIZED',
+        message: 'Authentication required'
+      }
+    });
   }
 
   if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
-    return res.status(403).json({ error: 'Admin access required' });
+    return res.status(403).json({
+      success: false,
+      error: {
+        code: 'FORBIDDEN',
+        message: 'Admin access required'
+      }
+    });
   }
 
   next();
@@ -73,11 +97,23 @@ export const requireAdmin = (req, res, next) => {
  */
 export const requireSuperAdmin = (req, res, next) => {
   if (!req.user) {
-    return res.status(401).json({ error: 'Authentication required' });
+    return res.status(401).json({
+      success: false,
+      error: {
+        code: 'UNAUTHORIZED',
+        message: 'Authentication required'
+      }
+    });
   }
 
   if (req.user.role !== 'superadmin') {
-    return res.status(403).json({ error: 'Superadmin access required' });
+    return res.status(403).json({
+      success: false,
+      error: {
+        code: 'FORBIDDEN',
+        message: 'Superadmin access required'
+      }
+    });
   }
 
   next();
@@ -90,24 +126,45 @@ export const requirePhoneNumber = async (req, res, next) => {
   try {
     const userId = req.user?.userId;
     if (!userId) {
-      return res.status(401).json({ error: 'Authentication required' });
+      return res.status(401).json({
+        success: false,
+        error: {
+          code: 'UNAUTHORIZED',
+          message: 'Authentication required'
+        }
+      });
     }
 
     const user = await User.findById(userId).select('phoneNumber');
     if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: 'USER_NOT_FOUND',
+          message: 'User not found'
+        }
+      });
     }
 
     if (!user.phoneNumber) {
       return res.status(428).json({
-        error: 'PHONE_REQUIRED',
-        message: 'Phone number must be added to continue'
+        success: false,
+        error: {
+          code: 'PHONE_REQUIRED',
+          message: 'Phone number must be added to continue'
+        }
       });
     }
 
     next();
   } catch (error) {
     console.error('Phone requirement check failed:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Internal server error'
+      }
+    });
   }
 };

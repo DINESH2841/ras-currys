@@ -1,6 +1,8 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
+import { hashOTP, verifyOTP, generateOTPCode, getOTPExpiry } from '../utils/otpHelper.js';
+import { logger } from '../config/logger.js';
 
 const SALT_ROUNDS = 12; // Enterprise-grade bcrypt rounds
 
@@ -50,7 +52,19 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  otpCodeHash: {
+    type: String,
+    default: null
+  },
   otpExpiry: {
+    type: Date,
+    default: null
+  },
+  loginAttempts: {
+    type: Number,
+    default: 0
+  },
+  loginLockUntil: {
     type: Date,
     default: null
   },
@@ -82,11 +96,12 @@ class UserModel {
       // Hash password with bcrypt
       const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
       
-      // Generate 6-digit OTP
-      const otpCode = crypto.randomInt(100000, 999999).toString();
+      // Generate 6-digit OTP and hash it
+      const otpCode = generateOTPCode();
+      const otpCodeHash = hashOTP(otpCode);
       
       // OTP expires in 10 minutes
-      const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
+      const otpExpiry = getOTPExpiry();
 
       const user = await User.create({
         fullName,
@@ -95,7 +110,8 @@ class UserModel {
         phoneVerified: false,
         passwordHash,
         role,
-        otpCode,
+        otpCode: null, // Don't store plain OTP anymore
+        otpCodeHash,   // Store hashed OTP instead
         otpExpiry,
         emailVerified: false
       });
@@ -157,11 +173,30 @@ class UserModel {
       throw new Error('Email already verified');
     }
 
-    if (!user.otpCode || user.otpCode !== otp) {
+    // Check OTP expiry first
+    if (new Date() > new Date(user.otpExpiry)) {
+      throw new Error('OTP expired');
+    }
+
+    // Verify hashed OTP
+    if (!user.otpCodeHash || !verifyOTP(otp, user.otpCodeHash)) {
       throw new Error('Invalid OTP');
     }
 
-    if (new Date() > new Date(user.otpExpiry)) {
+    // Mark email as verified and clear OTP without re-validating legacy missing fields
+    // CRITICAL: Do NOT touch passwordHash here
+    await User.updateOne(
+      { _id: user._id },
+      { $set: { emailVerified: true, otpCode: null, otpCodeHash: null, otpExpiry: null } },
+      { runValidators: false }
+    );
+
+    return {
+      id: user._id,
+      fullName: user.fullName || user.full_name || 'User',
+      email: user.email
+    };
+  }
       throw new Error('OTP expired');
     }
 
@@ -232,14 +267,15 @@ class UserModel {
       throw new Error('Please verify your email first');
     }
 
-    // Generate 6-digit OTP
-    const otpCode = crypto.randomInt(100000, 999999).toString();
-    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
+    // Generate 6-digit OTP and hash it
+    const otpCode = generateOTPCode();
+    const otpCodeHash = hashOTP(otpCode);
+    const otpExpiry = getOTPExpiry();
 
     // Use updateOne to avoid touching passwordHash
     await User.updateOne(
       { _id: user._id },
-      { $set: { otpCode, otpExpiry } },
+      { $set: { otpCode: null, otpCodeHash, otpExpiry } },
       { runValidators: false }
     );
 
@@ -257,12 +293,14 @@ class UserModel {
       throw new Error('User not found');
     }
 
-    if (!user.otpCode || user.otpCode !== otp) {
-      throw new Error('Invalid OTP');
-    }
-
+    // Check OTP expiry first
     if (new Date() > new Date(user.otpExpiry)) {
       throw new Error('OTP expired');
+    }
+
+    // Verify hashed OTP
+    if (!user.otpCodeHash || !verifyOTP(otp, user.otpCodeHash)) {
+      throw new Error('Invalid OTP');
     }
 
     // Hash new password with bcrypt (ONLY allowed place besides registration)
@@ -271,7 +309,7 @@ class UserModel {
     // Update password and clear OTP without re-validating legacy missing fields
     await User.updateOne(
       { _id: user._id },
-      { $set: { passwordHash, otpCode: null, otpExpiry: null } },
+      { $set: { passwordHash, otpCode: null, otpCodeHash: null, otpExpiry: null } },
       { runValidators: false }
     );
 
@@ -293,14 +331,15 @@ class UserModel {
       throw new Error('Email already verified');
     }
 
-    // Generate new OTP
-    const otpCode = crypto.randomInt(100000, 999999).toString();
-    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
+    // Generate new OTP and hash it
+    const otpCode = generateOTPCode();
+    const otpCodeHash = hashOTP(otpCode);
+    const otpExpiry = getOTPExpiry();
 
     // Use updateOne to avoid touching passwordHash
     await User.updateOne(
       { _id: user._id },
-      { $set: { otpCode, otpExpiry } },
+      { $set: { otpCode: null, otpCodeHash, otpExpiry } },
       { runValidators: false }
     );
 
@@ -314,6 +353,74 @@ class UserModel {
     return await User.find()
       .select('-passwordHash -otpCode -otpExpiry')
       .sort({ createdAt: -1 });
+  }
+
+  /**
+   * Check if account is locked due to too many failed login attempts
+   */
+  static async isAccountLocked(email) {
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await User.findOne({ email: normalizedEmail });
+
+    if (!user) {
+      return { locked: false };
+    }
+
+    if (user.loginLockUntil && new Date() < user.loginLockUntil) {
+      return {
+        locked: true,
+        lockedUntil: user.loginLockUntil,
+        message: 'Account is temporarily locked due to too many failed login attempts.'
+      };
+    }
+
+    return { locked: false };
+  }
+
+  /**
+   * Record failed login attempt
+   */
+  static async recordFailedLogin(email) {
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await User.findOne({ email: normalizedEmail });
+
+    if (!user) {
+      return;
+    }
+
+    const newAttempts = (user.loginAttempts || 0) + 1;
+    const lockUntil = newAttempts >= 10 ? new Date(Date.now() + 15 * 60 * 1000) : null; // 15 min lock
+
+    await User.updateOne(
+      { _id: user._id },
+      {
+        $set: {
+          loginAttempts: newAttempts,
+          loginLockUntil: lockUntil
+        }
+      },
+      { runValidators: false }
+    );
+
+    return { attempts: newAttempts, locked: !!lockUntil };
+  }
+
+  /**
+   * Reset login attempts on successful login
+   */
+  static async resetLoginAttempts(email) {
+    const normalizedEmail = email.toLowerCase().trim();
+
+    await User.updateOne(
+      { email: normalizedEmail },
+      {
+        $set: {
+          loginAttempts: 0,
+          loginLockUntil: null
+        }
+      },
+      { runValidators: false }
+    );
   }
 }
 

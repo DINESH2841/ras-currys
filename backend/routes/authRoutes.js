@@ -18,6 +18,12 @@ import {
   validatePhoneNumberOnly
 } from '../middleware/validation.js';
 import { authenticateToken, requirePhoneNumber } from '../middleware/auth.js';
+import {
+  loginLimiter,
+  emailVerificationLimiter,
+  forgotPasswordLimiter,
+  registrationLimiter
+} from '../middleware/rateLimiter.js';
 
 const router = express.Router();
 
@@ -26,21 +32,21 @@ const router = express.Router();
  * @desc    Register new user (sends OTP via email)
  * @access  Public
  */
-router.post('/register', validateRegistration, register);
+router.post('/register', registrationLimiter, validateRegistration, register);
 
 /**
  * @route   POST /api/auth/verify-email
  * @desc    Verify email with OTP (activates account, returns JWT)
  * @access  Public
  */
-router.post('/verify-email', validateOTP, verifyEmail);
+router.post('/verify-email', emailVerificationLimiter, validateOTP, verifyEmail);
 
 /**
  * @route   POST /api/auth/login
  * @desc    Login user (requires verified email)
  * @access  Public
  */
-router.post('/login', validateLogin, login);
+router.post('/login', loginLimiter, validateLogin, login);
 
 /**
  * @route   POST /api/auth/add-phone
@@ -54,7 +60,7 @@ router.post('/add-phone', authenticateToken, validatePhoneNumberOnly, addPhoneNu
  * @desc    Request password reset OTP
  * @access  Public
  */
-router.post('/forgot-password', validateEmail, forgotPassword);
+router.post('/forgot-password', forgotPasswordLimiter, validateEmail, forgotPassword);
 
 /**
  * @route   POST /api/auth/reset-password
@@ -68,7 +74,7 @@ router.post('/reset-password', validatePasswordReset, resetPassword);
  * @desc    Resend OTP for unverified users
  * @access  Public
  */
-router.post('/resend-otp', validateEmail, resendOTP);
+router.post('/resend-otp', emailVerificationLimiter, validateEmail, resendOTP);
 
 /**
  * @route   GET /api/auth/me

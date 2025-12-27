@@ -121,6 +121,17 @@ export const login = async (req, res) => {
     // Normalize email
     const normalizedEmail = email.toLowerCase().trim();
 
+    // Check if account is locked
+    const lockStatus = await UserModel.isAccountLocked(normalizedEmail);
+    if (lockStatus.locked) {
+      return res.status(423).json({
+        success: false,
+        error: 'ACCOUNT_LOCKED',
+        message: lockStatus.message,
+        lockedUntil: lockStatus.lockedUntil
+      });
+    }
+
     // Find user
     const user = await UserModel.findByEmail(normalizedEmail);
     if (!user) {
@@ -145,22 +156,29 @@ export const login = async (req, res) => {
     // Verify password with bcrypt
     const isValidPassword = await UserModel.verifyPassword(password, user.passwordHash);
     
-    // Temporary debug logging (remove after testing)
-    console.log('[LOGIN DEBUG]', {
-      email: normalizedEmail,
-      foundUser: !!user,
-      emailVerified: user.emailVerified,
-      hasPasswordHash: !!user.passwordHash,
-      passwordMatch: isValidPassword
-    });
-
     if (!isValidPassword) {
+      // Record failed login attempt
+      const attempt = await UserModel.recordFailedLogin(normalizedEmail);
+      
+      if (attempt.locked) {
+        return res.status(423).json({
+          success: false,
+          error: 'ACCOUNT_LOCKED',
+          message: 'Account is temporarily locked due to too many failed login attempts.',
+          lockedUntil: new Date(Date.now() + 15 * 60 * 1000)
+        });
+      }
+
       return res.status(401).json({
         success: false,
         error: 'Invalid credentials',
-        message: 'Email or password is incorrect'
+        message: 'Email or password is incorrect',
+        attemptsRemaining: Math.max(0, 10 - attempt.attempts)
       });
     }
+
+    // Reset login attempts on successful login
+    await UserModel.resetLoginAttempts(normalizedEmail);
 
     // Generate JWT token
     const token = generateToken({
