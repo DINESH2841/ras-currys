@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import OrderModel, { Order } from '../models/Order.js';
+import { logger } from '../config/logger.js';
 
 /**
  * Create a Razorpay order
@@ -173,7 +174,11 @@ export const handleWebhook = async (req, res) => {
       .digest('hex');
 
     if (expectedSignature !== signature) {
-      console.error('Webhook signature mismatch');
+      logger.warn('Webhook signature mismatch', {
+        received: signature,
+        expected: expectedSignature,
+        event: req.body?.event
+      });
       return res.status(400).json({
         success: false,
         error: 'SIGNATURE_MISMATCH',
@@ -185,6 +190,12 @@ export const handleWebhook = async (req, res) => {
     const event = req.body.event;
     const eventData = req.body.payload.payment.entity;
 
+    logger.info('Razorpay webhook received', {
+      event,
+      paymentId: eventData?.id,
+      orderId: eventData?.order_id
+    });
+
     if (event === 'payment.authorized' || event === 'payment.captured') {
       // Find order by razorpay order ID
       const order = await Order.findOne({ razorpayOrderId: eventData.order_id });
@@ -193,7 +204,11 @@ export const handleWebhook = async (req, res) => {
         await OrderModel.updatePaymentStatus(order._id, 'completed', eventData.id);
         await OrderModel.updateOrderStatus(order._id, 'confirmed');
 
-        console.log(`Order ${order.orderId} payment confirmed via webhook`);
+        logger.info('Payment completed via webhook', {
+          orderId: order._id,
+          paymentId: eventData.id,
+          event
+        });
       }
     } else if (event === 'payment.failed') {
       const order = await Order.findOne({ razorpayOrderId: eventData.order_id });
@@ -201,8 +216,14 @@ export const handleWebhook = async (req, res) => {
       if (order) {
         await OrderModel.updatePaymentStatus(order._id, 'failed');
 
-        console.log(`Order ${order.orderId} payment failed via webhook`);
+        logger.warn('Payment failed via webhook', {
+          orderId: order._id,
+          paymentId: eventData.id,
+          reason: eventData.error_reason
+        });
       }
+    } else {
+      logger.info(`Webhook event ${event} received but not processed`);
     }
 
     // Always respond with 200 to acknowledge receipt
@@ -211,7 +232,10 @@ export const handleWebhook = async (req, res) => {
       message: 'Webhook processed'
     });
   } catch (error) {
-    console.error('Webhook processing error:', error);
+    logger.error('Webhook processing error', {
+      error: error.message,
+      stack: error.stack
+    });
     // Still return 200 to prevent Razorpay from retrying
     res.status(200).json({
       success: false,

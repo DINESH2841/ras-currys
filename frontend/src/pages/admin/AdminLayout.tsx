@@ -3,7 +3,7 @@ import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../services/authContext';
 import { UserRole } from '../../types';
 import { LayoutDashboard, ShoppingBag, Package, LogOut, LifeBuoy, Users } from 'lucide-react';
-import { db } from '../../services/mockDatabase';
+import { apiClient } from '../../services/apiClient';
 import Footer from '../../components/Footer';
 
 const AdminLayout: React.FC = () => {
@@ -26,9 +26,8 @@ const AdminLayout: React.FC = () => {
 
   const fetchOpenTicketsCount = async () => {
     try {
-      const tickets = await db.getTickets();
-      const openCount = tickets.filter(t => t.status === 'open').length;
-      setOpenTicketsCount(openCount);
+      const response = await apiClient.get('/api/tickets?status=open');
+      setOpenTicketsCount(response.data?.length || 0);
     } catch (error) {
       console.error('Failed to fetch tickets:', error);
     }

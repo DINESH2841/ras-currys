@@ -71,6 +71,11 @@ export const verifyCsrfToken = (req, res, next) => {
     return next();
   }
 
+  // Skip CSRF verification for webhooks (they have their own signature verification)
+  if (req.path === '/api/payments/webhook' || req.path.includes('/webhook')) {
+    return next();
+  }
+
   try {
     // Get CSRF token from headers or body
     const token = req.headers['x-csrf-token'] || req.body?.csrfToken;

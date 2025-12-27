@@ -197,23 +197,6 @@ class UserModel {
       email: user.email
     };
   }
-      throw new Error('OTP expired');
-    }
-
-    // Mark email as verified and clear OTP without re-validating legacy missing fields
-    // CRITICAL: Do NOT touch passwordHash here
-    await User.updateOne(
-      { _id: user._id },
-      { $set: { emailVerified: true, otpCode: null, otpExpiry: null } },
-      { runValidators: false }
-    );
-
-    return {
-      id: user._id,
-      fullName: user.fullName || user.full_name || 'User',
-      email: user.email
-    };
-  }
 
   /**
    * Add or update phone number for a user
