@@ -1,13 +1,13 @@
 import express from 'express';
 import Ticket from '../models/Ticket.js';
-import { authenticateToken } from '../middleware/auth.js';
+import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// GET /api/tickets?user_id=xxx - Get tickets for a user
+// Users can only read their own tickets. Support staff use the separate admin route.
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const userId = req.query.user_id || req.user.userId;
+    const userId = req.user.userId;
     
     const tickets = await Ticket.find({ createdByUserId: userId })
       .sort({ createdAt: -1 })
@@ -27,6 +27,18 @@ router.get('/', authenticateToken, async (req, res) => {
     });
   } catch (error) {
     console.error('Get tickets error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch tickets' });
+  }
+});
+
+// GET /api/tickets/admin - Get tickets for support staff only
+router.get('/admin', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const filter = req.query.status ? { status: req.query.status } : {};
+    const tickets = await Ticket.find(filter).sort({ createdAt: -1 }).lean();
+    res.json({ success: true, tickets });
+  } catch (error) {
+    console.error('Get admin tickets error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch tickets' });
   }
 });

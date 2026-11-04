@@ -12,7 +12,7 @@ const AdminSupport: React.FC = () => {
   }, []);
 
   const fetchTickets = async () => {
-    const data = await apiClient.getTickets();
+    const data = await apiClient.getAdminTickets();
     // Sort by newest
     setTickets(data.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
     setLoading(false);

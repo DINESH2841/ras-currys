@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../services/authContext';
+import { apiClient } from '../services/apiClient';
 import Button from '../components/Button';
 import { Eye, EyeOff, Mail, Lock, User, AlertCircle, CheckCircle } from 'lucide-react';
 
@@ -45,12 +46,7 @@ const Login: React.FC = () => {
           return;
         }
         try {
-          const result = await (window as any).apiClient?.forgotPassword(email) || 
-            (await fetch('http://localhost:5000/api/auth/forgot-password', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ email })
-            }).then(r => r.json()));
+          const result = await apiClient.forgotPassword(email);
           if (result.success) {
             setOtpSent(true);
             setSuccess('OTP sent to your email');
@@ -67,12 +63,7 @@ const Login: React.FC = () => {
           return;
         }
         try {
-          const result = await (window as any).apiClient?.resetPassword(email, otp, newPassword) ||
-            (await fetch('http://localhost:5000/api/auth/reset-password', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ email, otp, newPassword })
-            }).then(r => r.json()));
+          const result = await apiClient.resetPassword(email, otp, newPassword);
           if (result.success) {
             setSuccess('Password reset successfully! Redirecting to login...');
             setTimeout(() => {
@@ -502,11 +493,7 @@ const Login: React.FC = () => {
                       type="button"
                       onClick={async () => {
                         try {
-                          const rsp = await fetch('http://localhost:5000/api/auth/resend-otp', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ email })
-                          }).then(r => r.json());
+                          const rsp = await apiClient.resendOTP(email);
                           if (rsp.success) {
                             setSuccess('OTP resent to your email. Please check your inbox.');
                           } else {

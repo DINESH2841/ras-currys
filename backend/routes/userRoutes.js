@@ -7,6 +7,10 @@ const router = express.Router();
 // GET /api/users/:id - Get user by ID
 router.get('/:id', authenticateToken, async (req, res) => {
   try {
+    const isAdmin = req.user.role === 'admin' || req.user.role === 'superadmin';
+    if (!isAdmin && req.params.id !== req.user.userId) {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
     const user = await User.findById(req.params.id).select('-passwordHash -otpCode -otpExpiry');
     
     if (!user) {

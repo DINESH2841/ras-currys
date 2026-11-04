@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { GoogleGenAI } from "@google/genai";
 import { apiClient } from '../services/apiClient';
 import { useAuth } from '../services/authContext';
 import Button from '../components/Button';
@@ -140,117 +139,15 @@ const Contact: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // 1. Initialize Gemini
-      const apiKey = import.meta.env.VITE_API_KEY || process.env.API_KEY;
-      if (!apiKey || apiKey === 'your_actual_google_api_key_here') {
-        // Use fallback FAQ system
-        const fallbackResponse = getFallbackResponse(userMessage);
-        if (fallbackResponse) {
-          setMessages(prev => [...prev, { role: 'model', text: fallbackResponse }]);
-        } else {
-          setMessages(prev => [...prev, { 
-            role: 'model', 
-            text: "I'd love to help! I can answer questions about:\n\n• Delivery times (30-45 mins)\n• Product pricing (₹200-₹550)\n• Order tracking\n• Ingredients & allergens\n• Payment methods\n• Refunds & issues (will create support ticket)\n\nFor other queries, please email support@rascurrys.com" 
-          }]);
-        }
-        setIsLoading(false);
-        return;
-      }
-      
-      const ai = new GoogleGenAI({ apiKey });
-      
-      const chat = ai.chats.create({
-        model: 'gemini-2.0-flash-exp',
-        config: {
-            systemInstruction: "You are a warm, professional, and appetizing customer support agent for 'RAS Currys'. We sell authentic Currys and Pickles. \n\n" +
-            "Key Info:\n" +
-            "- Delivery: 30-45 mins usually.\n" +
-            "- Pricing: In INR.\n" +
-            "- Orders: Ask users to check 'My Orders' for status.\n" +
-            "- Tone: Use words like 'delicious', 'spicy', 'aromatic', 'authentic'.\n\n" +
-            "Protocol for Issues:\n" +
-            "- If a user is angry, has a payment failure, or a complex issue you cannot resolve, apologize and IMMEDIATELY use the `notifyAdmin` tool to alert our team.\n" +
-            "- Do not ask the user to email us manually if you can use the tool.\n" +
-            "- After using the tool, inform the user that support has been notified.",
-            tools: [{ functionDeclarations: [notifyAdminTool] }],
-        }
-      });
-
-      // 2. Build history for context (simplified)
-      const history = messages.map(m => ({
-        role: m.role,
-        parts: [{ text: m.text }]
-      }));
-      
-      // We manually add the new user message to the chat send, 
-      // but in a real app we'd construct the full history or use a persistent chat object.
-      // For this demo, we'll just send the new message with the tool config active.
-      // A limitation here is losing history on each turn if we recreate `ai.chats.create`,
-      // but sticking to the request, we will just send the current message or simple context.
-      
-      let result = await chat.sendMessage({ message: userMessage });
-      
-      // 3. Handle Function Calls
-      const calls = result.functionCalls;
-      
-      if (calls && calls.length > 0) {
-        const call = calls[0];
-        if (call.name === 'notifyAdmin') {
-            const { issueSummary, urgency, userContact } = call.args as any;
-            
-            // Execute Tool
-            await apiClient.createTicket({
-              issueSummary,
-              urgency,
-              userContact: user?.email || userContact || user?.name || 'Anonymous',
-              created_by_user_id: user?.id
-            });
-
-            // Send response back to model
-            const toolResponse = {
-                functionResponses: [{
-                    id: call.id,
-                    name: call.name,
-                    response: { result: "Admin notified successfully. Ticket ID generated." }
-                }]
-            };
-            
-            // Get final text
-            const finalResult = await chat.sendMessage(toolResponse);
-            setMessages(prev => [...prev, { role: 'model', text: finalResult.text || "Support has been notified." }]);
-        }
-      } else {
-        setMessages(prev => [...prev, { role: 'model', text: result.text || "I'm sorry, I couldn't understand that." }]);
-      }
-
-    } catch (error: any) {
-      console.error("Gemini Error:", error);
-      
-      // Try fallback FAQ first
+      const response = await apiClient.chat(userMessage);
+      if (!response.success) throw new Error('AI service unavailable');
+      setMessages(prev => [...prev, { role: 'model', text: response.text }]);
+    } catch {
       const fallbackResponse = getFallbackResponse(userMessage);
       if (fallbackResponse) {
-        setMessages(prev => [...prev, { 
-          role: 'model', 
-          text: fallbackResponse
-        }]);
+        setMessages(prev => [...prev, { role: 'model', text: fallbackResponse }]);
       } else {
-        let errorMessage = "I apologize, but I'm having trouble connecting to the kitchen right now. Please try again later.";
-        
-        // Provide more specific error messages
-        if (error?.message?.includes('API key')) {
-          errorMessage = "There's an issue with the API configuration. Please contact support@rascurrys.com for assistance.";
-        } else if (error?.message?.includes('quota') || error?.message?.includes('limit')) {
-          errorMessage = "We're experiencing high demand right now. Please try again in a few moments or contact us directly.";
-        } else if (error?.message?.includes('network') || error?.message?.includes('fetch')) {
-          errorMessage = "Network connection issue. Please check your internet connection and try again.";
-        } else if (error?.status === 404) {
-          errorMessage = "AI service temporarily unavailable. Please contact us directly for immediate assistance.";
-        }
-        
-        setMessages(prev => [...prev, { 
-          role: 'model', 
-          text: errorMessage + "\n\nIn the meantime, you can:\n• Call us: +91-XXX-XXX-XXXX\n• Email: support@rascurrys.com\n• Check 'My Orders' for order status" 
-        }]);
+        setMessages(prev => [...prev, { role: 'model', text: "I’m having trouble connecting right now. Please try again shortly or email support@rascurrys.com." }]);
       }
     } finally {
       setIsLoading(false);

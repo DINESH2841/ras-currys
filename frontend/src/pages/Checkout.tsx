@@ -37,8 +37,8 @@ const Checkout: React.FC = () => {
 
     try {
       // 1. Create Order in Database (PENDING state)
-      const order = await apiClient.createOrder(user.id, items, totalPrice);
-      console.log("Order Created:", order.id);
+      const order = await apiClient.createOrder(items);
+      console.log("Order Created:", order.orderId);
 
       // SIMULATION OF PAYTM FLOW
       await new Promise(r => setTimeout(r, 1000));
@@ -49,7 +49,7 @@ const Checkout: React.FC = () => {
         const isSuccess = window.confirm(
           `Paytm Payment Gateway (Test Mode)\n\n` +
           `Merchant: RAS Currys\n` +
-          `Order ID: ${order.id}\n` +
+          `Order ID: ${order.orderId}\n` +
           `Amount: ₹${totalPrice}\n` +
           `Delivery: ${user.address}\n\n` +
           `Click OK to Simulate Success (Paid)\n` +
@@ -57,14 +57,11 @@ const Checkout: React.FC = () => {
         );
 
         if (isSuccess) {
-          const mockBankTxnId = `TXN_${Date.now()}`;
-          await apiClient.updateOrderStatus(order.id, 'paid' as any);
-          
+          // Payment verification is server-side; never mark an order paid from the browser.
           clearCart();
           navigate('/orders');
         } else {
            alert("Payment Cancelled or Failed.");
-           await apiClient.updateOrderStatus(order.id, 'failed' as any);
         }
       }
 

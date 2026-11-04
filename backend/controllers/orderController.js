@@ -1,5 +1,6 @@
 import OrderModel from '../models/Order.js';
 import UserModel from '../models/User.js';
+import Product from '../models/Product.js';
 
 /**
  * Create a new order
@@ -19,23 +20,27 @@ export const createOrder = async (req, res) => {
       });
     }
 
-    // Calculate total amount
-    let totalAmount = 0;
-    for (const item of items) {
-      if (!item.productId || !item.quantity || !item.price) {
+    const productIds = items.map(item => item.productId);
+    if (productIds.some(id => !id) || items.some(item => !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 100)) {
         return res.status(400).json({
           success: false,
           error: 'INVALID_ITEM',
-          message: 'Each item must have productId, quantity, and price'
+          message: 'Each item must have a product ID and a valid quantity'
         });
-      }
-      totalAmount += item.price * item.quantity;
     }
+    // One query prevents N+1 lookups and treats the catalog as the price authority.
+    const products = await Product.find({ _id: { $in: productIds } }).select('_id price').lean();
+    if (products.length !== new Set(productIds.map(String)).size) {
+      return res.status(400).json({ success: false, error: 'INVALID_PRODUCT' });
+    }
+    const prices = new Map(products.map(product => [String(product._id), product.price]));
+    const normalizedItems = items.map(item => ({ productId: item.productId, quantity: item.quantity, price: prices.get(String(item.productId)) }));
+    const totalAmount = normalizedItems.reduce((total, item) => total + item.price * item.quantity, 0);
 
     // Create order
     const order = await OrderModel.create({
       userId,
-      items,
+      items: normalizedItems,
       totalAmount,
       paymentMethod
     });

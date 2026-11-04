@@ -1,17 +1,19 @@
 import express from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import dotenv from 'dotenv';
 import { connectDatabase } from './config/database.js';
 import { verifyEmailConnection } from './services/emailService.js';
 import { logger } from './config/logger.js';
 import { requestIdMiddleware, requestLoggingMiddleware, errorLoggingMiddleware } from './middleware/requestLogger.js';
-import { csrfTokenMiddleware, verifyCsrfToken } from './middleware/csrf.js';
 import authRoutes from './routes/authRoutes.js';
 import productRoutes from './routes/productRoutes.js';
 import ticketRoutes from './routes/ticketRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import orderRoutes from './routes/orderRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
+import aiRoutes from './routes/aiRoutes.js';
+import { apiLimiter } from './middleware/rateLimiter.js';
 
 dotenv.config();
 
@@ -21,6 +23,9 @@ const PORT = process.env.PORT || 5000;
 // ==================== MIDDLEWARE ====================
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(compression({ threshold: 1024 }));
+// Apply the broad API budget before any potentially expensive middleware.
+app.use('/api', apiLimiter);
 
 // Request ID middleware (must be first)
 app.use(requestIdMiddleware);
@@ -46,11 +51,9 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'X-Request-ID']
 }));
 
-// CSRF token middleware (generates tokens)
-app.use(csrfTokenMiddleware);
-
-// CSRF verification middleware (verifies on state-changing requests)
-app.use(verifyCsrfToken);
+// The API authenticates with an Authorization bearer token, not cookies. CSRF
+// tokens are therefore not applicable and previously blocked every browser POST.
+// Keep CORS origins explicit and never add credentialed cookie auth without CSRF.
 
 // Security headers
 app.use((req, res, next) => {
@@ -76,6 +79,7 @@ app.use('/api/tickets', ticketRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/ai', aiRoutes);
 
 // 404 handler
 app.use((req, res) => {

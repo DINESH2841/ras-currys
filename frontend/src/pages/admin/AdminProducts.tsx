@@ -3,7 +3,6 @@ import { apiClient } from '../../services/apiClient';
 import { Product } from '../../types';
 import Button from '../../components/Button';
 import { Trash2, Plus, Image as ImageIcon } from 'lucide-react';
-import { GoogleGenAI } from '@google/genai';
 
 const AdminProducts: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
@@ -141,16 +140,8 @@ const AdminProducts: React.FC = () => {
 
   const generateDescription = async (name: string): Promise<string> => {
     try {
-      const apiKey = import.meta.env.VITE_API_KEY || process.env.API_KEY;
-      if (!apiKey || apiKey === 'your_actual_google_api_key_here') {
-        // Fallback template
-        return `${name} — an authentic, comforting Indian curry prepared with traditional spices and home-style flavors. Delicious with rice or roti.`;
-      }
-      const ai = new GoogleGenAI({ apiKey });
-      const chat = ai.chats.create({ model: 'gemini-2.0-flash-exp' });
-      const prompt = `Write a single appetizing sentence (18-30 words) describing the Indian curry "${name}". Avoid emojis, keep it friendly and enticing.`;
-      const res = await chat.sendMessage({ message: prompt });
-      return res.text || `${name} — a delicious Indian curry with aromatic spices and rich, home-style flavors.`;
+      const response = await apiClient.generateProductDescription(name);
+      return response.success && response.text ? response.text : `${name} — a delicious Indian curry with aromatic spices and rich, home-style flavors.`;
     } catch {
       return `${name} — a delicious Indian curry with aromatic spices and rich, home-style flavors.`;
     }
@@ -376,7 +367,7 @@ const AdminProducts: React.FC = () => {
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">
                     <div className="h-10 w-10 flex-shrink-0">
-                      <img className="h-10 w-10 rounded-full object-cover" src={product.image} alt="" onError={(e) => { (e.currentTarget as HTMLImageElement).src = `https://picsum.photos/seed/${encodeURIComponent(product.name)}/400/300`; }} />
+                      <img className="h-10 w-10 rounded-full object-cover" width="40" height="40" loading="lazy" decoding="async" src={product.image} alt="" onError={(e) => { (e.currentTarget as HTMLImageElement).src = `https://picsum.photos/seed/${encodeURIComponent(product.name)}/400/300`; }} />
                     </div>
                     <div className="ml-4">
                       <div className="text-sm font-medium text-gray-900">{product.name}</div>

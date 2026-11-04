@@ -31,17 +31,13 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "✓ Dependencies installed successfully" -ForegroundColor Green
 Write-Host ""
 
-# Check for .env.local
+# Backend-only AI configuration
 Write-Host "Checking environment configuration..." -ForegroundColor Cyan
-if (Test-Path ".env.local") {
-    Write-Host "✓ .env.local file found" -ForegroundColor Green
+if (Test-Path "backend/.env") {
+    Write-Host "✓ backend/.env file found" -ForegroundColor Green
 } else {
-    Write-Host "⚠ .env.local file not found. Creating template..." -ForegroundColor Yellow
-    @"
-VITE_API_KEY=your_google_gemini_api_key_here
-"@ | Out-File -FilePath ".env.local" -Encoding UTF8
-    Write-Host "✓ .env.local template created" -ForegroundColor Green
-    Write-Host "  Please add your Gemini API key to .env.local" -ForegroundColor Yellow
+    Write-Host "⚠ backend/.env file not found." -ForegroundColor Yellow
+    Write-Host "  Copy backend/.env.example to backend/.env and set server-only secrets there." -ForegroundColor Yellow
 }
 Write-Host ""
 
@@ -61,7 +57,7 @@ Write-Host "✓ Setup completed successfully!" -ForegroundColor Green
 Write-Host "================================" -ForegroundColor Green
 Write-Host ""
 Write-Host "Next steps:" -ForegroundColor Cyan
-Write-Host "1. Add your Gemini API key to .env.local" -ForegroundColor White
+Write-Host "1. Configure GEMINI_API_KEY in backend/.env (never in a VITE_ variable)" -ForegroundColor White
 Write-Host "2. Run 'npm run dev' to start the development server" -ForegroundColor White
 Write-Host "3. Open http://localhost:3000 in your browser" -ForegroundColor White
 Write-Host ""
