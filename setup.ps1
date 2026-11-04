@@ -57,7 +57,7 @@ Write-Host "✓ Setup completed successfully!" -ForegroundColor Green
 Write-Host "================================" -ForegroundColor Green
 Write-Host ""
 Write-Host "Next steps:" -ForegroundColor Cyan
-Write-Host "1. Configure GEMINI_API_KEY in backend/.env (never in a VITE_ variable)" -ForegroundColor White
+Write-Host "1. Configure GROQ_API_KEY in backend/.env (never in a VITE_ variable)" -ForegroundColor White
 Write-Host "2. Run 'npm run dev' to start the development server" -ForegroundColor White
 Write-Host "3. Open http://localhost:3000 in your browser" -ForegroundColor White
 Write-Host ""
