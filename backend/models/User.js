@@ -48,6 +48,10 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  lastVerificationReminderAt: {
+    type: Date,
+    default: null
+  },
   otpCode: {
     type: String,
     default: null
@@ -85,6 +89,7 @@ userSchema.index({ email: 1 });
 userSchema.index({ phoneNumber: 1 }, { unique: true, sparse: true });
 userSchema.index({ otpCode: 1 });
 userSchema.index({ emailVerified: 1 });
+userSchema.index({ emailVerified: 1, lastVerificationReminderAt: 1, createdAt: 1 });
 
 // Model methods
 class UserModel {

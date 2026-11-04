@@ -29,7 +29,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
         email: user.email,
         phoneNumber: user.phoneNumber,
         phoneVerified: user.phoneVerified,
-        role: user.role,
+        role: user.role === 'superadmin' ? 'admin' : user.role,
         emailVerified: user.emailVerified,
         createdAt: user.createdAt
       }

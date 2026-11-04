@@ -5,15 +5,10 @@
 ### 1. **Authentication & Authorization**
 - **Sign-In/Sign-Up**: Robust form validation (email regex, password strength with 8+ chars, uppercase, lowercase, numbers).
 - **Password Hashing**: SHA-256 with salt for secure storage (never exposed).
-- **Demo Accounts**:
-  - Admin: `admin@ras.com` / `Admin123`
-  - Regular User: `user@ras.com` / `User1234`
-  - SuperAdmin: `dineshsevenni@gmail.com` / `dinesh1234`
 - **Session Management**: 24-hour expiry, automatic logout.
 - **Role-Based Access**:
   - **USER**: Browse products, checkout, view orders, contact support, view own support tickets.
   - **ADMIN**: Manage products, orders (update status), view support tickets, see users (view-only).
-  - **SUPERADMIN**: All admin privileges + manage user roles (assign/revoke ADMIN role).
 
 ---
 
@@ -111,14 +106,11 @@
 
 ---
 
-### 6. **User Management (SuperAdmin)**
+### 6. **User Management**
 **Admin → Users**
 
-- **User List**: Shows all users with roles.
-- **Role Badges**: User role displayed (USER, ADMIN, SUPERADMIN).
-- **Change Roles**: SuperAdmin can change USER ↔ ADMIN.
-- **Protection**: SUPERADMIN role cannot be modified via UI.
-- **Admin View**: Non-SuperAdmin admins see "View only" message.
+- **User List**: Shows standard user and admin accounts only.
+- **Change Roles**: Authorized administrators can change USER ↔ ADMIN.
 
 ---
 
@@ -127,7 +119,7 @@
 
 - **Logged-Out**: Home, Menu, Contact & AI Help, Login, Sign Up.
 - **Logged-In User**: Home, Menu, Contact & AI Help, My Orders, My Support, Cart, Logout.
-- **Logged-In Admin/SuperAdmin**: + Dashboard link.
+- **Logged-In Admin**: + Dashboard link.
 - **Mobile Menu**: Fully responsive with all links.
 
 **Routing**
@@ -159,8 +151,7 @@ Open `http://localhost:3000` in your browser.
 ### Test Flows
 
 #### 1. **Sign In & Browse**
-- Click "Login" → use `user@ras.com` / `User1234`.
-- Browse "Our Menu", add items to cart, checkout.
+- Register a test account, verify its email, then browse the menu and checkout.
 
 #### 2. **AI Support**
 - Go to "Contact & AI Help".
@@ -169,7 +160,7 @@ Open `http://localhost:3000` in your browser.
 - Check "My Support" to see your ticket.
 
 #### 3. **Admin Features**
-- Sign in as `admin@ras.com` / `Admin123`.
+- Sign in with an administrator account created securely outside the repository.
 - Go to "Dashboard".
 - Click "Dashboard" → see stats.
 - Go to "Products":
@@ -189,14 +180,6 @@ Open `http://localhost:3000` in your browser.
   - See all user-reported tickets.
   - Click "Mark Resolved" to close a ticket.
 
-#### 4. **SuperAdmin Features**
-- Sign in as `dineshsevenni@gmail.com` / `dinesh1234`.
-- Go to "Users".
-- Change a USER to ADMIN (or ADMIN to USER).
-- See all users without password hashes.
-- All admin features are available.
-
----
 
 ## 📦 Deployment Ready
 - **Build**: `npm run build` → production bundle in `dist/`.

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { apiClient } from '../../services/apiClient';
 import { User, UserRole } from '../../types';
 import { useAuth } from '../../services/authContext';
-import { Loader2, ShieldCheck, Trash2, AlertCircle } from 'lucide-react';
+import { Loader2, Trash2, AlertCircle } from 'lucide-react';
 
 const AdminUsers: React.FC = () => {
   const [users, setUsers] = useState<any[]>([]);
@@ -21,9 +21,8 @@ const AdminUsers: React.FC = () => {
     setLoading(true);
     try {
       const list = await apiClient.getUsers();
-      // sort: SUPERADMIN first, then admins, then users
-      const order = (r: string) => r === 'superadmin' ? 0 : r === 'admin' ? 1 : 2;
-      setUsers(list.sort((a: any, b: any) => order(a.role) - order(b.role)));
+      // Privileged break-glass accounts must never be listed in the UI.
+      setUsers(list.filter((account: any) => account.role !== 'superadmin'));
     } catch (err) {
       setError('Failed to load users');
     }
@@ -93,21 +92,15 @@ const AdminUsers: React.FC = () => {
           <tbody className="bg-white divide-y divide-gray-200">
             {users.map(u => {
               const userId = u._id || u.id;
-              const isSuperAdmin = u.role === 'superadmin';
               const isCurrentUser = currentUser?.id === userId;
 
               return (
-              <tr key={userId} className={isSuperAdmin ? 'bg-purple-50' : ''}>
+              <tr key={userId}>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{u.name}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{u.email}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{u.phone || '-'}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm">
-                  {isSuperAdmin ? (
-                    <span className="inline-flex items-center gap-1 text-purple-700 bg-purple-100 border border-purple-300 px-2 py-1 rounded font-semibold uppercase text-xs">
-                      <ShieldCheck className="h-4 w-4"/> SUPERADMIN
-                    </span>
-                  ) : (
-                    <select
+                  <select
                       value={u.role}
                       onChange={(e) => changeRole(userId, e.target.value)}
                       disabled={savingId === userId || isCurrentUser}
@@ -120,13 +113,9 @@ const AdminUsers: React.FC = () => {
                       <option value="user">USER</option>
                       <option value="admin">ADMIN</option>
                     </select>
-                  )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  {isSuperAdmin ? (
-                    <span className="text-gray-400 text-xs font-medium">Immutable</span>
-                  ) : (
-                    <button
+                  <button
                       onClick={() => handleDelete(userId, u.name)}
                       disabled={deleting === userId || isCurrentUser}
                       className={`flex items-center gap-1 px-3 py-1 rounded text-red-600 border border-red-200 hover:bg-red-50 transition-colors text-xs font-medium ${
@@ -140,7 +129,6 @@ const AdminUsers: React.FC = () => {
                       )}
                       {deleting === userId ? 'Deleting...' : 'Delete'}
                     </button>
-                  )}
                 </td>
               </tr>
             );

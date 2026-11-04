@@ -531,15 +531,6 @@ const Login: React.FC = () => {
             </div>
           </div>
 
-          {!isSignUp && !isForgotPassword && (
-            <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-xs font-semibold text-blue-900 mb-2">Demo Accounts:</p>
-              <div className="space-y-1 text-xs text-blue-800">
-                <p>👤 Admin: <span className="font-mono">admin@ras.com</span> / <span className="font-mono">Admin123</span></p>
-                <p>👤 User: <span className="font-mono">user@ras.com</span> / <span className="font-mono">User1234</span></p>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>

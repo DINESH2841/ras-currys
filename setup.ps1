@@ -61,8 +61,4 @@ Write-Host "1. Configure GEMINI_API_KEY in backend/.env (never in a VITE_ variab
 Write-Host "2. Run 'npm run dev' to start the development server" -ForegroundColor White
 Write-Host "3. Open http://localhost:3000 in your browser" -ForegroundColor White
 Write-Host ""
-Write-Host "Demo accounts:" -ForegroundColor Cyan
-Write-Host "  Admin: admin@ras.com / Admin123" -ForegroundColor White
-Write-Host "  User:  user@ras.com / User1234" -ForegroundColor White
-Write-Host ""
 Write-Host "Happy coding! 🚀" -ForegroundColor Yellow

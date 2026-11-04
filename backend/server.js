@@ -4,6 +4,7 @@ import compression from 'compression';
 import dotenv from 'dotenv';
 import { connectDatabase } from './config/database.js';
 import { verifyEmailConnection } from './services/emailService.js';
+import { startVerificationReminderJob } from './services/verificationReminderJob.js';
 import { logger } from './config/logger.js';
 import { requestIdMiddleware, requestLoggingMiddleware, errorLoggingMiddleware } from './middleware/requestLogger.js';
 import authRoutes from './routes/authRoutes.js';
@@ -126,6 +127,7 @@ const startServer = async () => {
       logger.warn('⚠️ Please set SMTP_USER and SMTP_PASS in .env file');
     } else {
       logger.info('✓ Email service configured');
+      startVerificationReminderJob();
     }
 
     // Start server
