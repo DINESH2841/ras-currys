@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import OrderModel, { Order } from '../models/Order.js';
 import { logger } from '../config/logger.js';
+import { sendOrderStatusUpdate } from '../services/emailService.js';
 
 /**
  * Create a Razorpay order
@@ -138,6 +139,7 @@ export const verifyPayment = async (req, res) => {
 
     // Update order status to confirmed
     await OrderModel.updateOrderStatus(orderId, 'confirmed');
+    void OrderModel.findById(orderId).then(sendOrderStatusUpdate).catch(error => logger.warn('Order update email lookup failed', { error: error.message }));
 
     res.json({
       success: true,
@@ -203,6 +205,7 @@ export const handleWebhook = async (req, res) => {
       if (order) {
         await OrderModel.updatePaymentStatus(order._id, 'completed', eventData.id);
         await OrderModel.updateOrderStatus(order._id, 'confirmed');
+        void OrderModel.findById(order._id).then(sendOrderStatusUpdate).catch(error => logger.warn('Order update email lookup failed', { error: error.message }));
 
         logger.info('Payment completed via webhook', {
           orderId: order._id,

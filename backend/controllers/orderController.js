@@ -1,6 +1,7 @@
 import OrderModel from '../models/Order.js';
 import UserModel from '../models/User.js';
 import Product from '../models/Product.js';
+import { sendOrderStatusUpdate } from '../services/emailService.js';
 
 /**
  * Create a new order
@@ -166,6 +167,8 @@ export const updateOrderStatus = async (req, res) => {
     }
 
     const updatedOrder = await OrderModel.findById(id);
+    // Notification delivery is noncritical and must not delay or undo the update.
+    void sendOrderStatusUpdate(updatedOrder);
 
     res.json({
       success: true,
