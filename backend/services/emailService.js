@@ -14,15 +14,6 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-const orderTransporter = process.env.ORDER_SMTP_HOST && process.env.ORDER_SMTP_USER && process.env.ORDER_SMTP_PASS
-  ? nodemailer.createTransport({
-      host: process.env.ORDER_SMTP_HOST,
-      port: Number(process.env.ORDER_SMTP_PORT || 587),
-      secure: process.env.ORDER_SMTP_SECURE === 'true',
-      auth: { user: process.env.ORDER_SMTP_USER, pass: process.env.ORDER_SMTP_PASS }
-    })
-  : null;
-
 const verificationFrom = process.env.VERIFICATION_FROM_EMAIL || process.env.SMTP_USER || 'ras.currys@gmail.com';
 const orderFrom = process.env.ORDER_FROM_EMAIL || 'noreply@rascurrys.store';
 
@@ -240,15 +231,24 @@ export const sendWelcomeEmail = async (email, fullName) => {
 
 /** Send delivery/status notices through the ras.currys.store sender. */
 export const sendOrderStatusUpdate = async (order) => {
-  if (!orderTransporter || !order?.userId?.email) return { success: false, skipped: true };
+  if (!process.env.RESEND_API_KEY || !order?.userId?.email) return { success: false, skipped: true };
   try {
-    const info = await orderTransporter.sendMail({
-      from: `"RAS Currys Orders" <${orderFrom}>`,
-      to: order.userId.email,
-      subject: `Order ${order.orderId} is ${order.orderStatus}`,
-      text: `Your RAS Currys order ${order.orderId} is now ${order.orderStatus}.${order.trackingNumber ? ` Tracking number: ${order.trackingNumber}.` : ''}`
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from: `RAS Currys Orders <${orderFrom}>`,
+        to: [order.userId.email],
+        subject: `Order ${order.orderId} is ${order.orderStatus}`,
+        text: `Your RAS Currys order ${order.orderId} is now ${order.orderStatus}.${order.trackingNumber ? ` Tracking number: ${order.trackingNumber}.` : ''}`
+      })
     });
-    return { success: true, messageId: info.messageId };
+    if (!response.ok) throw new Error(`Resend returned ${response.status}`);
+    const result = await response.json();
+    return { success: true, messageId: result.id };
   } catch (error) {
     console.error('Order update email failed:', error.message);
     return { success: false, error: error.message };
