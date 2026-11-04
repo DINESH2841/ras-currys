@@ -167,7 +167,7 @@ const Contact: React.FC = () => {
                 <Bot className="h-6 w-6 mr-3" />
                 <div>
                   <h2 className="font-bold">RAS Assistant</h2>
-                  <p className="text-brand-100 text-xs">Powered by Gemini AI</p>
+                  <p className="text-brand-100 text-xs">Powered by AI</p>
                 </div>
              </div>
              <div className="flex items-center text-xs bg-brand-700 px-3 py-1 rounded-full">
