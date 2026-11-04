@@ -11,8 +11,7 @@ const MySupport: React.FC = () => {
 
   useEffect(() => {
     const load = async () => {
-      const all = await apiClient.getTickets(user?.id || null);
-      const mine = user ? all.filter((t: any) => t.created_by_user_id === user.id) : [];
+      const mine = user ? await apiClient.getTickets() : [];
       // Show newest first
       setTickets(mine.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
       setLoading(false);

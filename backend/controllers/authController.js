@@ -95,7 +95,7 @@ export const verifyEmail = async (req, res) => {
           phoneNumber: fullUser.phone_number || fullUser.phoneNumber || null,
           phoneVerified: fullUser.phone_verified ?? fullUser.phoneVerified ?? false,
           phoneRequired: !(fullUser.phone_number || fullUser.phoneNumber),
-          role: fullUser.role,
+          role: fullUser.role === 'superadmin' ? 'admin' : fullUser.role,
           emailVerified: true
         }
       }
@@ -199,7 +199,7 @@ export const login = async (req, res) => {
           phoneNumber: user.phoneNumber || null,
           phoneVerified: user.phoneVerified,
           phoneRequired: !user.phoneNumber,
-          role: user.role,
+          role: user.role === 'superadmin' ? 'admin' : user.role,
           emailVerified: user.emailVerified
         }
       }

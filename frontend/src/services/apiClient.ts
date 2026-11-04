@@ -3,7 +3,8 @@
  * Replaces localStorage-based mockDatabase with actual HTTP calls
  */
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api').replace(/\/$/, '');
+const REQUEST_TIMEOUT_MS = 12_000;
 
 // JWT token storage
 let authToken: string | null = null;
@@ -24,16 +25,24 @@ const getAuthToken = () => {
   return authToken;
 };
 
-const authFetch = async (url: string, options: any = {}) => {
+const request = async (url: string, options: any = {}, authenticated = false) => {
   const token = getAuthToken();
   const headers = {
     'Content-Type': 'application/json',
     ...(options.headers || {})
   } as Record<string, string>;
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-  const res = await fetch(url, { ...options, headers });
-  return res;
+  if (authenticated && token) headers['Authorization'] = `Bearer ${token}`;
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, { ...options, headers, signal: controller.signal });
+    if (!res.ok) throw new Error(`Request failed (${res.status})`);
+    return res;
+  } finally {
+    window.clearTimeout(timeout);
+  }
 };
+const authFetch = (url: string, options: any = {}) => request(url, options, true);
 
 export const apiClient = {
   // ==================== PRODUCTS ====================
@@ -41,7 +50,7 @@ export const apiClient = {
     const params = new URLSearchParams({ page: String(page), limit: String(limit) });
     if (category) params.append('category', category);
     if (search) params.append('search', search);
-    const res = await fetch(`${API_BASE}/products?${params}`);
+    const res = await request(`${API_BASE}/products?${params}`);
     const data = await res.json();
     // Normalize id field from MongoDB _id
     const items = (data.items || []).map((p: any) => ({ ...p, id: p.id || p._id }));
@@ -49,17 +58,17 @@ export const apiClient = {
   },
 
   async addProduct(product) {
-    const res = await fetch(`${API_BASE}/products`, {
+    const res = await authFetch(`${API_BASE}/products`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(product)
     });
     const p = await res.json();
-    return { ...p, id: p.id || p._id };
+    return { ...(p.item || p), id: p.item?._id || p.id || p._id };
   },
 
   async updateProduct(id, changes) {
-    const res = await fetch(`${API_BASE}/products/${id}`, {
+    const res = await authFetch(`${API_BASE}/products/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(changes)
@@ -69,13 +78,13 @@ export const apiClient = {
   },
 
   async deleteProduct(id) {
-    const res = await fetch(`${API_BASE}/products/${id}`, { method: 'DELETE' });
+    const res = await authFetch(`${API_BASE}/products/${id}`, { method: 'DELETE' });
     return res.json();
   },
 
   // ==================== AUTH ====================
   async login(email, password) {
-    const res = await fetch(`${API_BASE}/auth/login`, {
+    const res = await request(`${API_BASE}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })
@@ -92,7 +101,7 @@ export const apiClient = {
 
   async signup(name, email, password, phone) {
     // Use new register endpoint and field names
-    const res = await fetch(`${API_BASE}/auth/register`, {
+    const res = await request(`${API_BASE}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ fullName: name, email, phoneNumber: phone, password })
@@ -102,7 +111,7 @@ export const apiClient = {
   },
 
   async verifyEmail(email, otp) {
-    const res = await fetch(`${API_BASE}/auth/verify-email`, {
+    const res = await request(`${API_BASE}/auth/verify-email`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, otp })
@@ -115,7 +124,7 @@ export const apiClient = {
   },
 
   async forgotPassword(email) {
-    const res = await fetch(`${API_BASE}/auth/forgot-password`, {
+    const res = await request(`${API_BASE}/auth/forgot-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email })
@@ -124,7 +133,7 @@ export const apiClient = {
   },
 
   async resetPassword(email, otp, newPassword) {
-    const res = await fetch(`${API_BASE}/auth/reset-password`, {
+    const res = await request(`${API_BASE}/auth/reset-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, otp, newPassword })
@@ -133,7 +142,7 @@ export const apiClient = {
   },
 
   async resendOTP(email) {
-    const res = await fetch(`${API_BASE}/auth/resend-otp`, {
+    const res = await request(`${API_BASE}/auth/resend-otp`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email })
@@ -147,7 +156,7 @@ export const apiClient = {
   },
 
   async getUser(userId) {
-    const res = await fetch(`${API_BASE}/users/${userId}`);
+    const res = await authFetch(`${API_BASE}/users/${userId}`);
     return res.json();
   },
 
@@ -175,19 +184,20 @@ export const apiClient = {
   },
 
   // ==================== ORDERS ====================
-  async createOrder(userId, items, total) {
-    const res = await fetch(`${API_BASE}/orders`, {
+  async createOrder(items) {
+    const res = await authFetch(`${API_BASE}/orders`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: userId, items, total_amount: total, payment_gateway: 'PAYTM' })
+      body: JSON.stringify({ items: items.map(item => ({ productId: item.id, quantity: item.quantity })), paymentMethod: 'razorpay' })
     });
-    return res.json();
+    const data = await res.json();
+    return { ...data, id: data.data?._id, orderId: data.data?.orderId };
   },
 
   async getOrders(userId = null) {
-    const params = userId ? `?user_id=${userId}` : '';
-    const res = await fetch(`${API_BASE}/orders${params}`);
-    return res.json();
+    const res = await authFetch(`${API_BASE}/orders`);
+    const data = await res.json();
+    return data.data?.orders || [];
   },
 
   async updateOrderStatus(orderId, status) {
@@ -206,7 +216,7 @@ export const apiClient = {
 
   // ==================== SUPPORT TICKETS ====================
   async createTicket(ticket) {
-    const res = await fetch(`${API_BASE}/tickets`, {
+    const res = await authFetch(`${API_BASE}/tickets`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(ticket)
@@ -215,10 +225,26 @@ export const apiClient = {
   },
 
   async getTickets(userId = null) {
-    const params = userId ? `?user_id=${userId}` : '';
-    const res = await fetch(`${API_BASE}/tickets${params}`);
-    const arr = await res.json();
-    return (arr || []).map((t: any) => ({ ...t, id: t.id || t._id }));
+    const res = await authFetch(`${API_BASE}/tickets`);
+    const data = await res.json();
+    return (data.tickets || []).map((t: any) => ({ ...t, id: t.id || t._id }));
+  },
+
+  async getAdminTickets(status = '') {
+    const query = status ? `?status=${encodeURIComponent(status)}` : '';
+    const res = await authFetch(`${API_BASE}/tickets/admin${query}`);
+    const data = await res.json();
+    return (data.tickets || []).map((t: any) => ({ ...t, id: t.id || t._id }));
+  },
+
+  async chat(message) {
+    const res = await request(`${API_BASE}/ai/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message }) });
+    return res.json();
+  },
+
+  async generateProductDescription(name) {
+    const res = await authFetch(`${API_BASE}/ai/product-description`, { method: 'POST', body: JSON.stringify({ name }) });
+    return res.json();
   },
 
   async updateTicketStatus(ticketId, status) {

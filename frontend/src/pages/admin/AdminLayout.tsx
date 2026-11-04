@@ -26,8 +26,8 @@ const AdminLayout: React.FC = () => {
 
   const fetchOpenTicketsCount = async () => {
     try {
-      const response = await apiClient.get('/api/tickets?status=open');
-      setOpenTicketsCount(response.data?.length || 0);
+      const tickets = await apiClient.getAdminTickets('open');
+      setOpenTicketsCount(tickets.length);
     } catch (error) {
       console.error('Failed to fetch tickets:', error);
     }

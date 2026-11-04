@@ -105,7 +105,7 @@ const Orders: React.FC = () => {
                     <li key={`${order.id}-${index}`} className="py-3 flex justify-between items-center first:pt-0 last:pb-0">
                       <div className="flex items-center">
                         <div className="h-10 w-10 flex-shrink-0 bg-gray-100 rounded-md overflow-hidden">
-                          <img src={item.image} alt={item.name} className="h-full w-full object-cover" />
+                          <img src={item.image} alt={item.name} loading="lazy" decoding="async" className="h-full w-full object-cover" />
                         </div>
                         <div className="ml-4">
                           <p className="text-sm font-medium text-gray-900">{item.name}</p>

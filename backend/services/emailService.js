@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Create Gmail SMTP transporter
+// Verification mail is sent from the dedicated Gmail account.
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: parseInt(process.env.SMTP_PORT),
@@ -13,6 +13,9 @@ const transporter = nodemailer.createTransport({
     pass: process.env.SMTP_PASS,
   },
 });
+
+const verificationFrom = process.env.VERIFICATION_FROM_EMAIL || process.env.SMTP_USER || 'ras.currys@gmail.com';
+const orderFrom = process.env.ORDER_FROM_EMAIL || 'noreply@rascurrys.store';
 
 // Verify SMTP connection
 export const verifyEmailConnection = async () => {
@@ -31,7 +34,7 @@ export const verifyEmailConnection = async () => {
  */
 export const sendSignupOTP = async (email, fullName, otp) => {
   const mailOptions = {
-    from: `"RAS Currys" <${process.env.SMTP_USER}>`,
+    from: `"RAS Currys" <${verificationFrom}>`,
     to: email,
     subject: 'Verify Your Email - RAS Currys Registration',
     html: `
@@ -101,7 +104,7 @@ export const sendSignupOTP = async (email, fullName, otp) => {
  */
 export const sendPasswordResetOTP = async (email, fullName, otp) => {
   const mailOptions = {
-    from: `"RAS Currys Security" <${process.env.SMTP_USER}>`,
+    from: `"RAS Currys Security" <${verificationFrom}>`,
     to: email,
     subject: 'Password Reset Request - RAS Currys',
     html: `
@@ -171,7 +174,7 @@ export const sendPasswordResetOTP = async (email, fullName, otp) => {
  */
 export const sendWelcomeEmail = async (email, fullName) => {
   const mailOptions = {
-    from: `"RAS Currys" <${process.env.SMTP_USER}>`,
+    from: `"RAS Currys" <${verificationFrom}>`,
     to: email,
     subject: 'Welcome to RAS Currys! 🎉',
     html: `
@@ -222,6 +225,32 @@ export const sendWelcomeEmail = async (email, fullName) => {
     return { success: true, messageId: info.messageId };
   } catch (error) {
     console.error('✗ Failed to send welcome email:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+/** Send delivery/status notices through the ras.currys.store sender. */
+export const sendOrderStatusUpdate = async (order) => {
+  if (!process.env.RESEND_API_KEY || !order?.userId?.email) return { success: false, skipped: true };
+  try {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from: `RAS Currys Orders <${orderFrom}>`,
+        to: [order.userId.email],
+        subject: `Order ${order.orderId} is ${order.orderStatus}`,
+        text: `Your RAS Currys order ${order.orderId} is now ${order.orderStatus}.${order.trackingNumber ? ` Tracking number: ${order.trackingNumber}.` : ''}`
+      })
+    });
+    if (!response.ok) throw new Error(`Resend returned ${response.status}`);
+    const result = await response.json();
+    return { success: true, messageId: result.id };
+  } catch (error) {
+    console.error('Order update email failed:', error.message);
     return { success: false, error: error.message };
   }
 };

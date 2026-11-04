@@ -93,10 +93,24 @@ export const apiLimiter = rateLimit({
   skip: (req) => process.env.NODE_ENV === 'test'
 });
 
+// Expensive AI requests need a much lower budget than normal API traffic.
+export const aiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => res.status(429).json({
+    success: false,
+    error: 'RATE_LIMIT_EXCEEDED',
+    message: 'Too many AI requests. Please try again later.'
+  })
+});
+
 export default {
   loginLimiter,
   emailVerificationLimiter,
   forgotPasswordLimiter,
   registrationLimiter,
-  apiLimiter
+  apiLimiter,
+  aiLimiter
 };

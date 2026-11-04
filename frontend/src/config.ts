@@ -3,7 +3,6 @@
 // Environment Configuration
 export const config = {
   // API Configuration
-  geminiApiKey: import.meta.env.VITE_API_KEY || '',
   
   // App Configuration
   appName: 'RAS Currys',
@@ -35,9 +34,6 @@ export const config = {
 export const validateConfig = (): { valid: boolean; missing: string[] } => {
   const missing: string[] = [];
   
-  if (!config.geminiApiKey && config.isProduction) {
-    missing.push('VITE_API_KEY (required for Gemini AI support)');
-  }
   
   return {
     valid: missing.length === 0,

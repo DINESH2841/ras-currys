@@ -65,18 +65,6 @@ A modern, production-ready e-commerce platform for authentic Indian curries and 
 5. **Open in browser**
    Navigate to `http://localhost:3000`
 
-## 🔑 Demo Accounts
-
-### Admin Account
-- **Email**: `admin@ras.com`
-- **Password**: `Admin123`
-- Access to admin dashboard, product management, and order management
-
-### User Account
-- **Email**: `user@ras.com`
-- **Password**: `User1234`
-- Regular customer access
-
 ### New Registration
 - Click "Create a new account" on the login page
 - Fill in your details with a strong password

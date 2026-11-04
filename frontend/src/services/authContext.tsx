@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, UserRole } from '../types';
-import { apiClient } from './apiClient';
+import { apiClient, setAuthToken } from './apiClient';
 
 interface AuthResult {
   success: boolean;
@@ -80,6 +80,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = () => {
     setUser(null);
+    setAuthToken(null);
     localStorage.removeItem('ras_user');
     localStorage.removeItem('ras_session_expiry');
   };
